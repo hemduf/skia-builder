@@ -8,7 +8,7 @@ settings. This launcher loads the existing build script, removes those shared
 GPU defaults, and then runs the normal builder with ``-variant cpu``.
 
 This keeps the CPU build on the same code path as every other platform while
-ensuring that Graphite, OpenGL, Vulkan and Dawn remain disabled.
+ensuring that Ganesh, Graphite, OpenGL, Vulkan and Dawn remain disabled.
 """
 
 import importlib.util
@@ -32,12 +32,14 @@ def main():
 
     # CPU_ONLY_GN_ARGS already explicitly disables Graphite, GL and Vulkan,
     # while PLATFORM_GN_ARGS_CPU disables platform GPU backends such as Dawn.
-    # Remove the later shared defaults that would otherwise re-enable them.
+    # Remove the later shared defaults that would otherwise re-enable GL and
+    # Graphite, and disable Ganesh as well for a true raster/CPU-only build.
     builder.RELEASE_GN_ARGS = builder.RELEASE_GN_ARGS.replace(
         "skia_use_gl = true\n", ""
     ).replace(
         "skia_enable_graphite = true\n", ""
     )
+    builder.CPU_ONLY_GN_ARGS += "\nskia_enable_ganesh = false\n"
 
     args = sys.argv[1:]
     if "-variant" in args:
