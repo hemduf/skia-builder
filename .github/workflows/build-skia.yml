@@ -97,17 +97,17 @@ jobs:
             platform: linux
             variant: gpu
             arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            variant: gpu
+            arch: arm64
           - os: ubuntu-latest
             platform: wasm
             variant: gpu
             arch: "wasm32"
             config: Release
 
-          # ARM64 platforms (later)
-          # - os: ubuntu-24.04-arm
-          #   platform: linux
-          #   variant: gpu
-          #   arch: arm64
+          # Windows ARM64 (later)
           # - os: windows-11-arm
           #   platform: win
           #   variant: gpu
@@ -265,6 +265,19 @@ jobs:
           fi
           CONFIG="${{ matrix.config || 'Release' }}"
           python3 build-skia.py ${{ matrix.platform }} -variant ${{ matrix.variant }} -config $CONFIG --shallow -branch ${{ env.SKIA_BRANCH }} $ARCH_ARG $TARGET_ARG $CRT_ARG
+
+      - name: Validate Linux ARM64 output
+        if: steps.check.outputs.should_build == 'true' && !inputs.test_mode && matrix.platform == 'linux' && matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          CONFIG="${{ matrix.config || 'Release' }}"
+          LIB="build/linux-${{ matrix.variant }}/lib/${CONFIG}/arm64/libskia.a"
+          test -f "$LIB"
+          MEMBER=$(llvm-ar t "$LIB" | head -n 1)
+          test -n "$MEMBER"
+          llvm-ar p "$LIB" "$MEMBER" > /tmp/skia-arm64-smoke.o
+          llvm-readelf -h /tmp/skia-arm64-smoke.o | tee /tmp/skia-arm64-readelf.txt
+          grep -q 'Machine:.*AArch64' /tmp/skia-arm64-readelf.txt
 
       - name: Set archive name
         if: steps.check.outputs.should_build == 'true'
@@ -471,6 +484,7 @@ jobs:
             ./skia-build-win-x64-gpu-md-release/skia-build-win-x64-gpu-md-release.zip
             ./skia-build-win-x64-gpu-md-debug/skia-build-win-x64-gpu-md-debug.zip
             ./skia-build-linux-x64-gpu-release/skia-build-linux-x64-gpu-release.zip
+            ./skia-build-linux-arm64-gpu-release/skia-build-linux-arm64-gpu-release.zip
             ./skia-build-wasm-wasm32-gpu-release/skia-build-wasm-wasm32-gpu-release.zip
             ./Skia.xcframework/Skia.xcframework.zip
         env:
