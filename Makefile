@@ -16,7 +16,7 @@ EMSDK_PATH = $(SKIA_SRC_DIR)/third_party/externals/emsdk
 
 HTTP_PORT = 8080
 
-.PHONY: skia-mac skia-ios skia-wasm skia-linux clean example-mac example-wasm serve-wasm skia-xcframework skia-spm example-mac-graphite example-linux-graphite
+.PHONY: skia-mac skia-ios skia-wasm skia-linux skia-linux-arm64 clean example-mac example-wasm serve-wasm skia-xcframework skia-spm example-mac-graphite example-linux-graphite
 
 # Default target
 all: skia-mac example-mac
@@ -61,6 +61,10 @@ LINUX_GRAPHITE_BUILD_DIR = $(shell pwd)/example/build-linux-graphite
 # Build Skia for Linux
 skia-linux:
 	$(SKIA_BUILDER) linux
+
+# Build Skia for Linux ARM64 (Raspberry Pi OS 64-bit, other AArch64 Linux)
+skia-linux-arm64:
+	$(SKIA_BUILDER) linux -archs arm64
 
 # Build native Graphite example for macOS (requires GLFW: brew install glfw)
 example-mac-graphite: skia-mac
