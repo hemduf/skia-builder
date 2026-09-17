@@ -273,10 +273,8 @@ jobs:
           CONFIG="${{ matrix.config || 'Release' }}"
           LIB="build/linux-${{ matrix.variant }}/lib/${CONFIG}/arm64/libskia.a"
           test -f "$LIB"
-          MEMBERS=$(llvm-ar t "$LIB")
-          MEMBER=${MEMBERS%%$'\n'*}
+          MEMBER=$(llvm-ar t "$LIB" | awk 'NR == 1 { print }')
           test -n "$MEMBER"
-          echo "Inspecting archive member: $MEMBER"
           llvm-ar p "$LIB" "$MEMBER" > /tmp/skia-arm64-smoke.o
           llvm-readelf -h /tmp/skia-arm64-smoke.o | tee /tmp/skia-arm64-readelf.txt
           grep -q 'Machine:.*AArch64' /tmp/skia-arm64-readelf.txt
