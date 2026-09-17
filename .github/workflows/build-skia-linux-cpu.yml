@@ -1,0 +1,204 @@
+name: Build Skia Linux CPU
+run-name: Build Skia Linux CPU
+
+on:
+  workflow_dispatch:
+    inputs:
+      skia_branch:
+        description: 'Skia branch to build (e.g. chrome/m149)'
+        required: false
+        type: string
+        default: 'chrome/m149'
+      archs:
+        description: 'CPU architecture to build'
+        required: false
+        type: choice
+        options:
+          - all
+          - x64
+          - arm64
+        default: all
+      publish_release:
+        description: 'Attach CPU artifacts to the Skia release tag (all architectures only)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.skia_branch || 'chrome/m149' }}-${{ inputs.archs || 'all' }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-linux-cpu:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check architecture selection
+        id: check
+        shell: bash
+        run: |
+          REQUESTED="${{ inputs.archs || 'all' }}"
+          if [ "$REQUESTED" = "all" ] || [ "$REQUESTED" = "${{ matrix.arch }}" ]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        if: steps.check.outputs.should_build == 'true'
+        uses: actions/checkout@v6
+
+      - name: Free disk space
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+      - name: Install Linux build dependencies
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            libfontconfig1-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-xkb-dev \
+            libwayland-dev
+
+      - name: Set up Python
+        if: steps.check.outputs.should_build == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install LLVM and Clang
+        if: steps.check.outputs.should_build == 'true'
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: '20.1.0'
+          env: true
+
+      - name: Set Git default branch
+        if: steps.check.outputs.should_build == 'true'
+        run: git config --global init.defaultBranch main
+
+      - name: Cache depot_tools and Skia source
+        if: steps.check.outputs.should_build == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            build/tmp/depot_tools
+            build/src/skia
+          key: linux-${{ matrix.arch }}-cpu-depot-tools-skia-${{ inputs.skia_branch || 'chrome/m149' }}-${{ hashFiles('build-skia.py', 'build-skia-cpu.py') }}
+
+      - name: Build CPU-only Skia
+        if: steps.check.outputs.should_build == 'true'
+        shell: bash
+        run: |
+          python3 build-skia-cpu.py linux \
+            -archs ${{ matrix.arch }} \
+            -config Release \
+            --shallow \
+            -branch "${{ inputs.skia_branch || 'chrome/m149' }}"
+
+      - name: Validate CPU-only GN configuration
+        if: steps.check.outputs.should_build == 'true'
+        shell: bash
+        run: |
+          SUMMARY="build/linux-cpu/lib/gn_args.txt"
+          test -f "$SUMMARY"
+
+          grep -q 'skia_enable_ganesh = false' "$SUMMARY"
+          grep -q 'skia_enable_graphite = false' "$SUMMARY"
+          grep -q 'skia_use_gl = false' "$SUMMARY"
+          grep -q 'skia_use_vulkan = false' "$SUMMARY"
+          grep -q 'skia_use_dawn = false' "$SUMMARY"
+
+          if grep -q 'skia_enable_ganesh = true' "$SUMMARY"; then
+            echo 'Ganesh was unexpectedly enabled'
+            exit 1
+          fi
+          if grep -q 'skia_enable_graphite = true' "$SUMMARY"; then
+            echo 'Graphite was unexpectedly enabled'
+            exit 1
+          fi
+          if grep -q 'skia_use_gl = true' "$SUMMARY"; then
+            echo 'OpenGL was unexpectedly enabled'
+            exit 1
+          fi
+          if grep -q 'skia_use_vulkan = true' "$SUMMARY"; then
+            echo 'Vulkan was unexpectedly enabled'
+            exit 1
+          fi
+          if grep -q 'skia_use_dawn = true' "$SUMMARY"; then
+            echo 'Dawn was unexpectedly enabled'
+            exit 1
+          fi
+
+      - name: Validate object architecture
+        if: steps.check.outputs.should_build == 'true'
+        shell: bash
+        run: |
+          LIB="build/linux-cpu/lib/Release/${{ matrix.arch }}/libskia.a"
+          test -f "$LIB"
+          MEMBER=$(llvm-ar t "$LIB" | head -n 1)
+          test -n "$MEMBER"
+          llvm-ar p "$LIB" "$MEMBER" > /tmp/skia-cpu-smoke.o
+          llvm-readelf -h /tmp/skia-cpu-smoke.o | tee /tmp/skia-cpu-readelf.txt
+
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            grep -q 'Machine:.*AArch64' /tmp/skia-cpu-readelf.txt
+          else
+            grep -Eq 'Machine:.*(Advanced Micro Devices X86-64|x86-64)' /tmp/skia-cpu-readelf.txt
+          fi
+
+      - name: Package CPU build
+        if: steps.check.outputs.should_build == 'true'
+        shell: bash
+        run: |
+          NAME="skia-build-linux-${{ matrix.arch }}-cpu-release"
+          SHARE_DIR=""
+          if [ -d build/share ]; then
+            SHARE_DIR="build/share"
+          fi
+          zip -r "${NAME}.zip" build/include $SHARE_DIR build/linux-cpu
+
+      - name: Upload artifact
+        if: steps.check.outputs.should_build == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: skia-build-linux-${{ matrix.arch }}-cpu-release
+          path: skia-build-linux-${{ matrix.arch }}-cpu-release.zip
+
+  publish-release:
+    if: ${{ inputs.publish_release && inputs.archs == 'all' }}
+    needs: build-linux-cpu
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download CPU artifacts
+        uses: actions/download-artifact@v7
+
+      - name: Attach CPU artifacts to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.skia_branch || 'chrome/m149' }}
+          files: |
+            ./skia-build-linux-x64-cpu-release/skia-build-linux-x64-cpu-release.zip
+            ./skia-build-linux-arm64-cpu-release/skia-build-linux-arm64-cpu-release.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

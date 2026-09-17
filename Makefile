@@ -4,6 +4,7 @@ $(shell ulimit -n 2048)
 # Makefile for Skia static libs and example builds
 
 SKIA_BUILDER = python3 build-skia.py
+SKIA_CPU_BUILDER = python3 build-skia-cpu.py
 
 # Build directories
 BUILD_DIR = $(shell pwd)/build
@@ -16,7 +17,7 @@ EMSDK_PATH = $(SKIA_SRC_DIR)/third_party/externals/emsdk
 
 HTTP_PORT = 8080
 
-.PHONY: skia-mac skia-ios skia-wasm skia-linux skia-linux-arm64 clean example-mac example-wasm serve-wasm skia-xcframework skia-spm example-mac-graphite example-linux-graphite
+.PHONY: skia-mac skia-ios skia-wasm skia-linux skia-linux-arm64 skia-linux-cpu skia-linux-arm64-cpu clean example-mac example-wasm serve-wasm skia-xcframework skia-spm example-mac-graphite example-linux-graphite
 
 # Default target
 all: skia-mac example-mac
@@ -65,6 +66,14 @@ skia-linux:
 # Build Skia for Linux ARM64 (Raspberry Pi OS 64-bit, other AArch64 Linux)
 skia-linux-arm64:
 	$(SKIA_BUILDER) linux -archs arm64
+
+# Build CPU-only Skia for Linux x64
+skia-linux-cpu:
+	$(SKIA_CPU_BUILDER) linux -archs x64
+
+# Build CPU-only Skia for Linux ARM64 / Raspberry Pi OS 64-bit
+skia-linux-arm64-cpu:
+	$(SKIA_CPU_BUILDER) linux -archs arm64
 
 # Build native Graphite example for macOS (requires GLFW: brew install glfw)
 example-mac-graphite: skia-mac
