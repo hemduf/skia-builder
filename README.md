@@ -4,7 +4,7 @@ This is a python script and github actions workflow to manage building static li
 
 ![output](https://github.com/user-attachments/assets/b40cc273-272c-4f38-a64f-968327408fa5)
 
-The script automates the process of building the libraries for various platforms (macOS, iOS, Windows, WASM). It handles the setup of the build environment, cloning of the Skia repository, configuration of build parameters, and compilation. The script also includes functionality for creating universal binaries for macOS and an XCFramework for apple platforms.
+The script automates the process of building the libraries for various platforms (macOS, iOS, visionOS, Windows, Linux, WASM). It handles the setup of the build environment, cloning of the Skia repository, configuration of build parameters, and compilation. The script also includes functionality for creating universal binaries for macOS and an XCFramework for apple platforms.
 
 The GN Args are supplied in constants which you will need to tweak if you want to modify the build.
 
@@ -14,7 +14,7 @@ Skia's build scripts requires ninja and python3 to be installed on all platforms
 
 ## Helper commands
 
-There is a Makefile with helper commands to build the libraries for each platform (from macOS). On windows you can use the `build-win.sh` script.
+There is a Makefile with helper commands to build the libraries for each platform (from macOS/Linux). On windows you can use the `build-win.sh` script.
 
 ```bash
 make example-mac # Build example for macOS (will also build libSkia etc)
@@ -26,6 +26,8 @@ Other options:
 ```bash
 make skia-mac # Build libraries for macOS
 make skia-ios # Build libraries for iOS
+make skia-linux # Build libraries for Linux x64
+make skia-linux-arm64 # Build libraries for Linux ARM64 / Raspberry Pi OS 64-bit
 make skia-wasm # Build libraries for WASM
 make skia-xcframework # Build XCFramework
 make example-mac # Build example for macOS
@@ -38,7 +40,7 @@ make serve-wasm # Serve the WASM example
 The script is called as follows
 
 ```
-build-skia.py [-h] [-config {Debug,Release}] [-archs ARCHS] [-branch BRANCH] [--shallow] {mac,ios,win,spm,wasm}
+build-skia.py [-h] [-config {Debug,Release}] [-archs ARCHS] [-branch BRANCH] [--shallow] {mac,ios,visionos,win,linux,wasm,xcframework}
 ```
 
 ## Building on macOS
@@ -71,6 +73,37 @@ python3 build-skia.py -config Release -branch chrome/m129 ios
 python3 build-skia.py -config Release -branch chrome/m129 xcframework
 ```
 
+## Building on Linux / Raspberry Pi
+
+Linux builds support both `x64` and `arm64`. Raspberry Pi support targets a 64-bit Linux userspace (for example Raspberry Pi OS 64-bit).
+
+Install the Linux build dependencies:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ninja-build clang libfontconfig1-dev libgl1-mesa-dev libglu1-mesa-dev libx11-xcb-dev libxcb1-dev libxcb-xkb-dev libwayland-dev
+```
+
+Build the ARM64 package directly on a Raspberry Pi or another AArch64 Linux machine:
+
+```bash
+python3 build-skia.py linux -archs arm64 -variant gpu -config Release -branch chrome/m149
+```
+
+or:
+
+```bash
+make skia-linux-arm64
+```
+
+The GPU variant enables Vulkan and Dawn/Graphite. The generated libraries are written under:
+
+```text
+build/linux-gpu/lib/Release/arm64/
+```
+
+CI also builds this target natively on GitHub's ARM64 Linux runner and publishes `skia-build-linux-arm64-gpu-release.zip` with full releases.
+
 ## Building on Windows 
 
 On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors.
@@ -99,6 +132,8 @@ Windows GPU builds enable ANGLE (`skia_use_angle=true`). The Windows packages in
 
 The repository includes a GitHub Actions workflow (`.github/workflows/build-skia.yml`) that builds all platforms in parallel and creates releases tagged with the Skia branch name.
 
+Linux is built for both x64 and ARM64; the ARM64 job runs natively on `ubuntu-24.04-arm` and is suitable for Raspberry Pi OS 64-bit / generic AArch64 Linux targets.
+
 ### Workflow Inputs
 
 | Input | Description | Default |
@@ -117,6 +152,7 @@ gh workflow run build-skia.yml
 # Build specific platform(s) without creating a release
 gh workflow run build-skia.yml -f platforms=visionos -f skip_release=true
 gh workflow run build-skia.yml -f platforms=mac,ios -f skip_release=true
+gh workflow run build-skia.yml -f platforms=linux -f skip_release=true
 gh workflow run build-skia.yml -f platforms=win -f skip_release=true
 
 # Build with a different Skia branch
