@@ -102,14 +102,6 @@ jobs:
             variant: gpu
             arch: arm64
           - os: ubuntu-latest
-            platform: linux
-            variant: cpu
-            arch: x64
-          - os: ubuntu-24.04-arm
-            platform: linux
-            variant: cpu
-            arch: arm64
-          - os: ubuntu-latest
             platform: wasm
             variant: gpu
             arch: "wasm32"
@@ -120,13 +112,17 @@ jobs:
           #   platform: win
           #   variant: gpu
           #   arch: arm64
-          # Other CPU variants (later)
+          # CPU variants
           # - os: macos-15
           #   platform: mac
           #   variant: cpu
           #   arch: ""
           # - os: windows-2022
           #   platform: win
+          #   variant: cpu
+          #   arch: x64
+          # - os: ubuntu-24.04
+          #   platform: linux
           #   variant: cpu
           #   arch: x64
           # - os: ubuntu-latest
@@ -268,32 +264,7 @@ jobs:
             CRT_ARG="-crt ${{ matrix.crt }}"
           fi
           CONFIG="${{ matrix.config || 'Release' }}"
-          BUILD_SCRIPT="build-skia.py"
-          VARIANT_ARG="-variant ${{ matrix.variant }}"
-          if [ "${{ matrix.variant }}" = "cpu" ]; then
-            BUILD_SCRIPT="build-skia-cpu.py"
-            VARIANT_ARG=""
-          fi
-          python3 "$BUILD_SCRIPT" ${{ matrix.platform }} $VARIANT_ARG -config $CONFIG --shallow -branch ${{ env.SKIA_BRANCH }} $ARCH_ARG $TARGET_ARG $CRT_ARG
-
-      - name: Validate Linux CPU configuration
-        if: steps.check.outputs.should_build == 'true' && !inputs.test_mode && matrix.platform == 'linux' && matrix.variant == 'cpu'
-        shell: bash
-        run: |
-          SUMMARY="build/linux-cpu/lib/gn_args.txt"
-          test -f "$SUMMARY"
-          grep -q 'skia_enable_graphite = false' "$SUMMARY"
-          grep -q 'skia_use_gl = false' "$SUMMARY"
-          grep -q 'skia_use_vulkan = false' "$SUMMARY"
-          grep -q 'skia_use_dawn = false' "$SUMMARY"
-          if grep -q 'skia_enable_graphite = true' "$SUMMARY"; then
-            echo "Graphite was unexpectedly enabled in CPU build"
-            exit 1
-          fi
-          if grep -q 'skia_use_gl = true' "$SUMMARY"; then
-            echo "OpenGL was unexpectedly enabled in CPU build"
-            exit 1
-          fi
+          python3 build-skia.py ${{ matrix.platform }} -variant ${{ matrix.variant }} -config $CONFIG --shallow -branch ${{ env.SKIA_BRANCH }} $ARCH_ARG $TARGET_ARG $CRT_ARG
 
       - name: Validate Linux ARM64 output
         if: steps.check.outputs.should_build == 'true' && !inputs.test_mode && matrix.platform == 'linux' && matrix.arch == 'arm64'
@@ -514,8 +485,6 @@ jobs:
             ./skia-build-win-x64-gpu-md-debug/skia-build-win-x64-gpu-md-debug.zip
             ./skia-build-linux-x64-gpu-release/skia-build-linux-x64-gpu-release.zip
             ./skia-build-linux-arm64-gpu-release/skia-build-linux-arm64-gpu-release.zip
-            ./skia-build-linux-x64-cpu-release/skia-build-linux-x64-cpu-release.zip
-            ./skia-build-linux-arm64-cpu-release/skia-build-linux-arm64-cpu-release.zip
             ./skia-build-wasm-wasm32-gpu-release/skia-build-wasm-wasm32-gpu-release.zip
             ./Skia.xcframework/Skia.xcframework.zip
         env:
