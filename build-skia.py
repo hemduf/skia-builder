@@ -505,9 +505,28 @@ class SkiaBuildScript:
             return BASE_DIR / f"win{variant_suffix}" / "lib"
 
     def setup_depot_tools(self):
+        # depot_tools recently changed its ninja wrapper to run through its
+        # bootstrapped Python. Fresh checkouts can therefore fail before any
+        # compilation with a missing python3_bin_reldir.txt. Preserve the
+        # already-installed native Ninja ahead of depot_tools so both this
+        # script and nested Dawn/CMake builds resolve the native executable.
+        depot_tools_dir = os.path.normcase(os.path.abspath(DEPOT_TOOLS_PATH))
+        native_search_path = os.pathsep.join(
+            entry for entry in os.environ.get("PATH", "").split(os.pathsep)
+            if entry and os.path.normcase(os.path.abspath(entry)) != depot_tools_dir
+        )
+        native_ninja = shutil.which("ninja", path=native_search_path)
+        if not native_ninja:
+            raise RuntimeError("Native Ninja executable not found outside depot_tools")
+
         if not DEPOT_TOOLS_PATH.exists():
             subprocess.run(["git", "clone", DEPOT_TOOLS_URL, str(DEPOT_TOOLS_PATH)], check=True)
-        os.environ["PATH"] = f"{DEPOT_TOOLS_PATH}:{os.environ['PATH']}"
+
+        os.environ["PATH"] = os.pathsep.join([
+            str(Path(native_ninja).parent),
+            str(DEPOT_TOOLS_PATH),
+            os.environ["PATH"],
+        ])
 
     def sync_deps(self):
         os.chdir(SKIA_SRC_DIR)
