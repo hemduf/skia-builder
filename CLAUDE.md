@@ -8,7 +8,7 @@ This repository provides a Python script and GitHub Actions workflow for buildin
 
 ## Build Commands
 
-Prerequisites: ninja, python3, cmake. On Windows, LLVM must be installed at `C:\Program Files\LLVM\`. On Linux, install build dependencies: `libfontconfig1-dev libgl1-mesa-dev libglu1-mesa-dev libx11-xcb-dev libwayland-dev`.
+Prerequisites: ninja, python3, CMake 4.4.3. CI pins CMake 4.4.3 on every platform. On Windows, LLVM must be installed at `C:\Program Files\LLVM\`. On Linux, install build dependencies: `libfontconfig1-dev libgl1-mesa-dev libglu1-mesa-dev libx11-xcb-dev libwayland-dev`.
 
 ```bash
 # May need to increase file limit on macOS first

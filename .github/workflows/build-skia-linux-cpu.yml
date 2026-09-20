@@ -84,6 +84,12 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install pinned CMake
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          python -m pip install --disable-pip-version-check --upgrade "cmake==4.4.3"
+          cmake --version
+
       - name: Install LLVM and Clang
         if: steps.check.outputs.should_build == 'true'
         uses: KyleMayes/install-llvm-action@v2

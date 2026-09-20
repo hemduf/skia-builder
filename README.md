@@ -6,7 +6,7 @@ This is a python script and github actions workflow to manage building static li
 
 The script automates the process of building the libraries for various platforms (macOS, iOS, visionOS, Windows, Linux, WASM). It handles the setup of the build environment, cloning of the Skia repository, configuration of build parameters, and compilation. The script also includes functionality for creating universal binaries for macOS and an XCFramework for apple platforms.
 
-The GN Args are supplied in constants which you will need to tweak if you want to modify the build. The CLI and CI default to `chrome/m153`; pass `-branch`/`skia_branch` to test another Skia branch.
+The GN Args are supplied in constants which you will need to tweak if you want to modify the build. The CLI and CI default to `chrome/m153`; pass `-branch`/`skia_branch` to test another Skia branch. CI pins CMake 4.4.3 on every platform so Dawn/Graphite builds use the same CMake behavior across macOS, iOS, visionOS, Windows, Linux and WASM.
 
 ## Building
 
@@ -106,7 +106,7 @@ CI also builds this target natively on GitHub's ARM64 Linux runner and publishes
 
 ## Building on Windows 
 
-On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors. Skia M153's Dawn build also requires CMake 4.4+ with `clang-cl` because Dawn builds its C++20 module interface; CI pins CMake 4.4.3.
+On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors. Skia M153's Dawn build uses C++20 modules with `clang-cl`, which is supported by the repository's pinned CMake 4.4.3 toolchain.
 
 LLVM should be installed in `C:\Program Files\LLVM\`
 
