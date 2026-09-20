@@ -182,6 +182,7 @@ skia_use_system_expat = false
 skia_use_system_icu = false
 skia_use_system_harfbuzz = false
 skia_use_system_libwebp = false
+skia_use_partition_alloc = false
 
 skia_use_libwebp_decode = true
 skia_use_libwebp_encode = false
