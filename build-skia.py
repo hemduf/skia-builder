@@ -64,6 +64,7 @@ BASE_DIR = Path(__file__).resolve().parent / "build"
 DEPOT_TOOLS_PATH = BASE_DIR / "tmp" / "depot_tools"
 DEPOT_TOOLS_URL = "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 SKIA_GIT_URL = "https://github.com/google/skia.git"
+DEFAULT_SKIA_BRANCH = "chrome/m153"
 SKIA_SRC_DIR = BASE_DIR / "src" / "skia"
 TMP_DIR = BASE_DIR / "tmp" / "skia"
 ACTIVATE_EMSDK_PATH = SKIA_SRC_DIR / "bin" / "activate-emsdk"
@@ -231,10 +232,7 @@ PLATFORM_GN_ARGS = {
 
     "win": """
     skia_use_dawn = true
-    # Keep Direct3D enabled. M149 makes GrBackendFormatData::equal unconditionally
-    # pure virtual while GrD3DBackendFormatData's override is gated by GPU_TEST_UTILS,
-    # leaving the subclass abstract in Release builds. patches/fix_m149_d3d_backend_surface.patch
-    # ungates the override so D3D Release builds compile. Re-enable plain once Skia fixes upstream.
+    # Keep Direct3D enabled for the Windows Ganesh backend.
     skia_use_direct3d = true
     is_trivial_abi = false
     """,
@@ -408,7 +406,7 @@ class SkiaBuildScript:
                            help="Target platform or xcframework")
         parser.add_argument("-config", choices=["Debug", "Release"], default="Release", help="Build configuration")
         parser.add_argument("-archs", help="Target architectures (comma-separated)")
-        parser.add_argument("-branch", help="Skia Git branch to checkout", default="main")
+        parser.add_argument("-branch", help=f"Skia Git branch to checkout (default: {DEFAULT_SKIA_BRANCH})", default=DEFAULT_SKIA_BRANCH)
         parser.add_argument("-variant", choices=["cpu", "gpu"], default="gpu",
                            help="Build variant: cpu (no GPU) or gpu (with Graphite/Dawn)")
         parser.add_argument("-target", choices=["device", "simulator", "all"], default="all",
@@ -678,7 +676,7 @@ class SkiaBuildScript:
         # On Windows, ninja expects targets without the .lib extension
         if self.platform == "win":
             libs_to_build = [lib[:-4] if lib.endswith('.lib') else lib for lib in libs_to_build]
-        # On wasm, M149+ outputs lib<name>.wasm.a (when is_canvaskit=false),
+        # Skia's current WASM toolchain outputs lib<name>.wasm.a (when is_canvaskit=false),
         # so pass bare GN target names to ninja and rename at move_libs time.
         elif self.platform == "wasm":
             libs_to_build = [lib[3:-2] if lib.startswith('lib') and lib.endswith('.a') else lib for lib in libs_to_build]
@@ -725,7 +723,7 @@ class SkiaBuildScript:
 
         # Copy the libraries
         for lib in LIBS[self.platform]:
-            # M149+ wasm toolchain emits lib<name>.wasm.a; copy to lib<name>.a for compatibility.
+            # Normalize lib<name>.wasm.a to lib<name>.a for downstream compatibility.
             if self.platform == "wasm" and lib.endswith('.a'):
                 src_file = src_dir / f"{lib[:-2]}.wasm.a"
             else:
@@ -1307,40 +1305,36 @@ if (skia_use_angle) {
         colored_print(f"Patched {ACTIVATE_EMSDK_PATH} to prevent emscripten downloading.", Colors.OKGREEN)
 
     def apply_patches(self):
-        """Apply any patches from the patches directory."""
+        """Apply repository patches and fail if the pinned Skia source no longer matches."""
         patches_dir = Path(__file__).resolve().parent / "patches"
         if not patches_dir.exists():
             return
 
         os.chdir(SKIA_SRC_DIR)
 
-        # Apply .patch files using git apply
+        # Apply unified diff patches. A compatibility failure must stop the build:
+        # continuing would package a partially patched Skia tree.
         for patch_file in sorted(patches_dir.glob("*.patch")):
             colored_print(f"Applying patch: {patch_file.name}", Colors.OKBLUE)
-            try:
-                # Check if patch is already applied
-                result = subprocess.run(
-                    ["git", "apply", "--check", "--reverse", str(patch_file)],
-                    capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    colored_print(f"  Patch {patch_file.name} already applied, skipping.", Colors.OKCYAN)
-                    continue
 
-                # Apply the patch
-                subprocess.run(["git", "apply", str(patch_file)], check=True)
-                colored_print(f"  Applied {patch_file.name} successfully.", Colors.OKGREEN)
-            except subprocess.CalledProcessError as e:
-                colored_print(f"  Warning: Failed to apply {patch_file.name}: {e}", Colors.WARNING)
+            result = subprocess.run(
+                ["git", "apply", "--check", "--reverse", str(patch_file)],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                colored_print(f"  Patch {patch_file.name} already applied, skipping.", Colors.OKCYAN)
+                continue
 
-        # Apply Python patch scripts (for complex patches that can't use git diff)
+            subprocess.run(["git", "apply", "--check", str(patch_file)], check=True)
+            subprocess.run(["git", "apply", str(patch_file)], check=True)
+            colored_print(f"  Applied {patch_file.name} successfully.", Colors.OKGREEN)
+
+        # Python patch scripts handle structured edits that are awkward as diffs.
+        # They must also fail fast when their upstream anchors change.
         for patch_script in sorted(patches_dir.glob("apply_*.py")):
             colored_print(f"Running patch script: {patch_script.name}", Colors.OKBLUE)
-            try:
-                subprocess.run([sys.executable, str(patch_script), str(SKIA_SRC_DIR)], check=True)
-                colored_print(f"  Ran {patch_script.name} successfully.", Colors.OKGREEN)
-            except subprocess.CalledProcessError as e:
-                colored_print(f"  Warning: Failed to run {patch_script.name}: {e}", Colors.WARNING)
+            subprocess.run([sys.executable, str(patch_script), str(SKIA_SRC_DIR)], check=True)
+            colored_print(f"  Ran {patch_script.name} successfully.", Colors.OKGREEN)
 
     def run(self):
         self.parse_arguments()
