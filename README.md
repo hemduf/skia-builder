@@ -106,7 +106,7 @@ CI also builds this target natively on GitHub's ARM64 Linux runner and publishes
 
 ## Building on Windows 
 
-On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors.
+On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors. Skia M153's Dawn build also requires CMake 4.4+ with `clang-cl` because Dawn builds its C++20 module interface; CI pins CMake 4.4.3.
 
 LLVM should be installed in `C:\Program Files\LLVM\`
 

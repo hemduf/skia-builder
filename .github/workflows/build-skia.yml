@@ -199,6 +199,20 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install CMake 4.4 for clang-cl modules
+        if: steps.check.outputs.should_build == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --upgrade cmake==4.4.3
+          $cmakeDir = Join-Path $env:pythonLocation "Scripts"
+          $cmakeExe = Join-Path $cmakeDir "cmake.exe"
+          if (-not (Test-Path $cmakeExe)) {
+            throw "CMake 4.4.3 executable not found at $cmakeExe"
+          }
+          $env:PATH = "$cmakeDir;$env:PATH"
+          $cmakeDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $cmakeExe --version
+
       - name: Set Git default branch
         if: steps.check.outputs.should_build == 'true'
         run: git config --global init.defaultBranch main
