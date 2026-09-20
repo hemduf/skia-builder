@@ -16,7 +16,7 @@ class DawnPatchCompatibilityTests(unittest.TestCase):
     def test_replace_once_rejects_upstream_drift(self):
         path = Path("third_party/dawn/BUILD.gn")
         with self.assertRaisesRegex(RuntimeError, "expected exactly one patch anchor"):
-            dawn_patch.replace_once(path, "no expected anchor here", "anchor", "replacement")
+            dawn_patch.replace_once(path, "no expected token here", "anchor", "replacement")
 
     def test_replace_once_replaces_single_anchor(self):
         path = Path("third_party/dawn/BUILD.gn")
