@@ -6,7 +6,7 @@ This is a python script and github actions workflow to manage building static li
 
 The script automates the process of building the libraries for various platforms (macOS, iOS, visionOS, Windows, Linux, WASM). It handles the setup of the build environment, cloning of the Skia repository, configuration of build parameters, and compilation. The script also includes functionality for creating universal binaries for macOS and an XCFramework for apple platforms.
 
-The GN Args are supplied in constants which you will need to tweak if you want to modify the build.
+The GN Args are supplied in constants which you will need to tweak if you want to modify the build. The CLI and CI default to `chrome/m153`; pass `-branch`/`skia_branch` to test another Skia branch. CI pins CMake 4.4.3 on every platform so Dawn/Graphite builds use the same CMake behavior across macOS, iOS, visionOS, Windows, Linux and WASM.
 
 ## Building
 
@@ -58,19 +58,19 @@ Note: macOS builds target macOS 11+ (Big Sur). This is hardcoded in Skia's `gn/s
 ### Build for macOS universal (arm64 & x86_64 intel)
 
 ```bash
-python3 build-skia.py -config Release -branch chrome/m129 mac
+python3 build-skia.py -config Release -branch chrome/m153 mac
 ```
 
 ### Build for iOS (including x86_64 simulator)
 
 ```bash
-python3 build-skia.py -config Release -branch chrome/m129 ios
+python3 build-skia.py -config Release -branch chrome/m153 ios
 ```
 
 ### Build an XCFramework
 
 ```bash
-python3 build-skia.py -config Release -branch chrome/m129 xcframework
+python3 build-skia.py -config Release -branch chrome/m153 xcframework
 ```
 
 ## Building on Linux / Raspberry Pi
@@ -87,7 +87,7 @@ sudo apt-get install -y ninja-build clang libfontconfig1-dev libgl1-mesa-dev lib
 Build the ARM64 package directly on a Raspberry Pi or another AArch64 Linux machine:
 
 ```bash
-python3 build-skia.py linux -archs arm64 -variant gpu -config Release -branch chrome/m149
+python3 build-skia.py linux -archs arm64 -variant gpu -config Release -branch chrome/m153
 ```
 
 or:
@@ -106,12 +106,12 @@ CI also builds this target natively on GitHub's ARM64 Linux runner and publishes
 
 ## Building on Windows 
 
-On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors.
+On Windows, you need to install LLVM in order to compile Skia with clang, as recommened by the authors. Skia M153's Dawn build uses C++20 modules with `clang-cl`, which is supported by the repository's pinned CMake 4.4.3 toolchain.
 
 LLVM should be installed in `C:\Program Files\LLVM\`
 
 ```bash
-py -3 build-skia.py -config Release -branch chrome/m129 win
+py -3 build-skia.py -config Release -branch chrome/m153 win
 ```
 
 ### CRT linkage (/MT vs /MD)
@@ -119,7 +119,7 @@ py -3 build-skia.py -config Release -branch chrome/m129 win
 By default Windows libraries are built with the static CRT (`/MT`, `/MTd` for Debug). Pass `-crt MD` to build against the dynamic CRT (`/MD`, `/MDd` for Debug) instead — this also switches Dawn's CMake build to `MultiThreadedDLL`. MD builds are output to `build/win-gpu-md/lib/` so they don't collide with the default MT output in `build/win-gpu/lib/`.
 
 ```bash
-py -3 build-skia.py -config Release -branch chrome/m129 -crt MD win
+py -3 build-skia.py -config Release -branch chrome/m153 -crt MD win
 ```
 
 In CI, MD builds are published as separate zips: `skia-build-win-x64-gpu-md-release.zip` and `skia-build-win-x64-gpu-md-debug.zip` (the existing MT artifact names are unchanged).
@@ -138,7 +138,7 @@ Linux is built for both x64 and ARM64; the ARM64 job runs natively on `ubuntu-24
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `skia_branch` | Skia branch to build | `chrome/m144` |
+| `skia_branch` | Skia branch to build | `chrome/m153` |
 | `platforms` | Platforms to build (comma-separated or `all`) | `all` |
 | `skip_release` | Skip creating release | `false` |
 | `test_mode` | Skip build, create dummy files | `false` |
@@ -156,7 +156,7 @@ gh workflow run build-skia.yml -f platforms=linux -f skip_release=true
 gh workflow run build-skia.yml -f platforms=win -f skip_release=true
 
 # Build with a different Skia branch
-gh workflow run build-skia.yml -f skia_branch=chrome/m145
+gh workflow run build-skia.yml -f skia_branch=chrome/m154
 ```
 
 ### Check CI Status
@@ -171,7 +171,7 @@ gh run view <run-id> --log-failed
 If you've already built all platforms, you can create an XCFramework without rebuilding:
 
 ```bash
-gh workflow run create-xcframework.yml -f release_tag=chrome/m144
+gh workflow run create-xcframework.yml -f release_tag=chrome/m153
 ```
 
 This downloads mac, ios, and visionos artifacts from the specified release and creates a combined XCFramework.

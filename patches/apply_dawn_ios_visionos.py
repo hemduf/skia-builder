@@ -10,6 +10,18 @@ empty context lines.
 import sys
 from pathlib import Path
 
+
+def replace_once(path: Path, content: str, old: str, new: str) -> str:
+    """Replace one upstream anchor or fail loudly when Skia/Dawn drifted."""
+    count = content.count(old)
+    if count != 1:
+        raise RuntimeError(
+            f"{path}: expected exactly one patch anchor, found {count}. "
+            "Revalidate the Dawn patch against the selected Skia branch."
+        )
+    return content.replace(old, new, 1)
+
+
 def apply_patches(skia_dir: Path):
     """Apply all Dawn iOS/visionOS patches."""
     dawn_dir = skia_dir / "third_party" / "dawn"
@@ -19,7 +31,7 @@ def apply_patches(skia_dir: Path):
     content = args_gni.read_text()
 
     if "dawn_target_platform" not in content:
-        new_content = content.replace(
+        new_content = replace_once(args_gni, content,
             '  dawn_enable_vulkan = is_linux || is_android\n}',
             '''  dawn_enable_vulkan = is_linux || is_android
 
@@ -53,7 +65,7 @@ def apply_patches(skia_dir: Path):
   }
 
   args += sanitizer_args'''
-        new_content = content.replace('  args += sanitizer_args', insertion)
+        new_content = replace_once(build_gn, content, '  args += sanitizer_args', insertion)
         build_gn.write_text(new_content)
         print("  Patched BUILD.gn")
     else:
@@ -65,7 +77,7 @@ def apply_patches(skia_dir: Path):
 
     if "get_ios_settings" not in content:
         # Update imports
-        new_content = content.replace(
+        new_content = replace_once(build_dawn_py, content,
             '''from cmake_utils import (add_common_cmake_args, combine_into_library,
                          discover_dependencies, get_cmake_os_cpu,
                          get_windows_settings, quote_if_needed, write_depfile,
@@ -78,7 +90,7 @@ def apply_patches(skia_dir: Path):
         )
 
         # Add new arguments
-        new_content = new_content.replace(
+        new_content = replace_once(build_dawn_py, new_content,
             '''parser.add_argument(
       "--dawn_enable_vulkan", default="false", help="Enable Vulkan backend.")
   args = parser.parse_args()''',
@@ -94,7 +106,7 @@ def apply_patches(skia_dir: Path):
         )
 
         # Add iOS/visionOS handling
-        new_content = new_content.replace(
+        new_content = replace_once(build_dawn_py, new_content,
             '''if target_os == "Darwin" or target_os == "iOS":
     configure_cmd.append(f"-DCMAKE_OSX_ARCHITECTURES={target_cpu}")
 
@@ -133,7 +145,7 @@ def apply_patches(skia_dir: Path):
 
     if "get_ios_settings" not in content:
         # Add iOS to get_cmake_os_cpu
-        new_content = content.replace(
+        new_content = replace_once(cmake_utils_py, content,
             '''  if os == "mac":
     target_cpu_map = {
       "arm64": "arm64",
@@ -267,7 +279,7 @@ def get_visionos_settings(target_cpu, is_simulator=False):
 
 def get_windows_settings(args):'''
 
-        new_content = new_content.replace('def get_windows_settings(args):', ios_visionos_functions)
+        new_content = replace_once(cmake_utils_py, new_content, 'def get_windows_settings(args):', ios_visionos_functions)
 
         cmake_utils_py.write_text(new_content)
         print("  Patched cmake_utils.py")

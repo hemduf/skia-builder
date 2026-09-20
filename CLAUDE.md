@@ -8,7 +8,7 @@ This repository provides a Python script and GitHub Actions workflow for buildin
 
 ## Build Commands
 
-Prerequisites: ninja, python3, cmake. On Windows, LLVM must be installed at `C:\Program Files\LLVM\`. On Linux, install build dependencies: `libfontconfig1-dev libgl1-mesa-dev libglu1-mesa-dev libx11-xcb-dev libwayland-dev`.
+Prerequisites: ninja, python3, CMake 4.4.3. CI pins CMake 4.4.3 on every platform. On Windows, LLVM must be installed at `C:\Program Files\LLVM\`. On Linux, install build dependencies: `libfontconfig1-dev libgl1-mesa-dev libglu1-mesa-dev libx11-xcb-dev libwayland-dev`.
 
 ```bash
 # May need to increase file limit on macOS first
@@ -25,13 +25,13 @@ python3 build-skia.py xcframework                  # Apple XCFramework (macOS + 
 
 # Options
 python3 build-skia.py <platform> -config Debug    # Debug build (default: Release)
-python3 build-skia.py <platform> -branch chrome/m130  # Specific Skia branch
+python3 build-skia.py <platform> -branch chrome/m153  # Specific Skia branch
 python3 build-skia.py <platform> --shallow        # Shallow clone
 python3 build-skia.py <platform> -archs x86_64,arm64  # Specific architectures
 python3 build-skia.py win -crt MD                 # Windows dynamic CRT (/MD; default MT)
 
 # Windows (use py -3 or the build-win.sh helper)
-py -3 build-skia.py win -config Release -branch chrome/m130
+py -3 build-skia.py win -config Release -branch chrome/m153
 ```
 
 **Makefile shortcuts (from macOS):**
@@ -48,7 +48,7 @@ make clean              # Remove build directory
 
 ## Architecture
 
-**build-skia.py** - Main build script containing:
+**build-skia.py** - Main build script containing (default Skia branch: `chrome/m153`):
 - `SkiaBuildScript` class orchestrating the entire build process
 - GN argument constants (`RELEASE_GN_ARGS`, `PLATFORM_GN_ARGS`) defining Skia build configuration
 - `LIBS` dict specifying which libraries to build per platform
@@ -98,7 +98,7 @@ This approach was informed by research into:
 The GitHub Actions workflow (`.github/workflows/build-skia.yml`) builds all platforms in parallel and creates releases tagged with the Skia branch name.
 
 **Workflow inputs:**
-- `skia_branch` - Skia branch to build (default: `chrome/m144`)
+- `skia_branch` - Skia branch to build (default: `chrome/m153`)
 - `platforms` - Platforms to build, comma-separated or `all` (default: `all`)
 - `skip_release` - Skip creating release, useful for testing (default: `false`)
 - `test_mode` - Skip actual build, create dummy files (default: `false`)
@@ -112,12 +112,12 @@ gh workflow run build-skia.yml -f platforms=visionos -f skip_release=true
 gh workflow run build-skia.yml -f platforms=mac,ios -f skip_release=true
 
 # Build with different Skia branch
-gh workflow run build-skia.yml -f skia_branch=chrome/m145
+gh workflow run build-skia.yml -f skia_branch=chrome/m154
 
 # Check CI status
 gh run list
 gh run view <run-id> --log-failed
 
 # Create XCFramework from existing release (without rebuilding)
-gh workflow run create-xcframework.yml -f release_tag=chrome/m144
+gh workflow run create-xcframework.yml -f release_tag=chrome/m153
 ```
