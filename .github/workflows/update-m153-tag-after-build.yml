@@ -1,0 +1,29 @@
+name: Update M153 tag after successful build
+
+on:
+  workflow_run:
+    workflows:
+      - Build Skia
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  update-tag:
+    if: ${{ github.event.workflow_run.id == 35537477304 && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout successful build commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Move chrome/m153 tag to validated commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -f chrome/m153 "${{ github.event.workflow_run.head_sha }}"
+          git push origin refs/tags/chrome/m153 --force
