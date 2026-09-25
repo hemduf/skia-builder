@@ -198,6 +198,12 @@ skia_enable_svg = true
 skia_enable_skottie = true
 skia_enable_pdf = false
 skia_enable_skparagraph = true
+
+# Issue #440 research experiment: build a variant with the upstream
+# thread-local strike cache enabled so it can be benchmarked against the
+# production chrome/m153 archive. Experimental builder branch only; the
+# production chrome/m153 release/tag is not modified by this change.
+skia_enable_threadlocal_strikecache = true
 """
 
 # Platform-specific GN args
