@@ -1200,37 +1200,29 @@ if (skia_use_angle) {
         colored_print("Skia repository setup complete.", Colors.OKGREEN)
 
     def setup_gn_for_windows_arm64(self):
-        """Download x64 GN binary for Windows ARM64 (works under emulation)."""
-        import platform
-        import urllib.request
-        import zipfile
-        import io
+        """Make the pinned upstream downloader use x64 GN on Windows ARM64.
 
-        # Only needed on Windows ARM64
+        git-sync-deps always runs bin/fetch-gn, even if bin/gn.exe exists.
+        Patch its host selection before sync; retain its exact GN revision,
+        extraction and depot_tools copy rather than downloading a floating GN.
+        """
+        import platform
+
         if sys.platform != "win32" or platform.machine().lower() not in ("arm64", "aarch64"):
             return
 
-        gn_path = SKIA_SRC_DIR / "bin" / "gn.exe"
-        if gn_path.exists():
-            colored_print("GN binary already exists, skipping download.", Colors.OKBLUE)
+        fetch_gn = SKIA_SRC_DIR / "bin" / "fetch-gn"
+        if not fetch_gn.is_file():
+            raise RuntimeError(f"Missing upstream GN downloader: {fetch_gn}")
+        content = fetch_gn.read_text()
+        anchor = "  cpu = {'aarch64': 'arm64', 'amd64': 'amd64', 'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine().lower()]"
+        replacement = anchor + "\n  # skia-builder: run pinned x64 GN under Windows ARM64 emulation.\n  if OS == 'windows' and cpu == 'arm64':\n    cpu = 'amd64'"
+        if content.count(anchor) != 1:
+            raise RuntimeError(f"Expected exactly one GN CPU mapping in {fetch_gn}")
+        if replacement in content:
             return
-
-        colored_print("Downloading GN for Windows ARM64 (x64 version)...", Colors.OKBLUE)
-        gn_url = "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
-
-        try:
-            gn_dir = SKIA_SRC_DIR / "bin"
-            gn_dir.mkdir(parents=True, exist_ok=True)
-
-            with urllib.request.urlopen(gn_url) as response:
-                zip_data = io.BytesIO(response.read())
-
-            with zipfile.ZipFile(zip_data) as zf:
-                zf.extractall(gn_dir)
-
-            colored_print(f"GN downloaded to {gn_path}", Colors.OKGREEN)
-        except Exception as e:
-            colored_print(f"Warning: Failed to download GN: {e}", Colors.WARNING)
+        fetch_gn.write_text(content.replace(anchor, replacement, 1))
+        colored_print("Prepared pinned GN downloader for Windows ARM64 (x64 emulation).", Colors.OKGREEN)
 
     def generate_gn_args_summary(self, arch: str):
         if self.variant == "cpu":
