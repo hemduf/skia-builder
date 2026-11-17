@@ -239,15 +239,25 @@ jobs:
         if: steps.check.outputs.should_build == 'true' && matrix.os == 'windows-11-arm'
         shell: pwsh
         run: |
-          $llvmUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-woa64.exe"
+          $llvmUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.0/LLVM-22.1.0-woa64.exe"
           $installerPath = "$env:TEMP\llvm-installer.exe"
           Write-Host "Downloading LLVM installer..."
           Invoke-WebRequest -Uri $llvmUrl -OutFile $installerPath
+          # The ARM runner's current MSVC STL requires Clang 22 or newer.
+          # Pin the official release asset rather than suppressing STL1000.
+          $expectedHash = "7ee9bcf18d69bcf23aa8bae631baa18388f50dfb92ee08361a5b956963e38009"
+          $actualHash = (Get-FileHash -Algorithm SHA256 $installerPath).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) { throw "LLVM installer checksum mismatch" }
           Write-Host "Installing LLVM silently..."
-          Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
-          Write-Host "LLVM installed successfully"
-          # Add LLVM to PATH
-          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $installer = Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait -PassThru
+          if ($installer.ExitCode -ne 0) { throw "LLVM installer failed: $($installer.ExitCode)" }
+          $llvmBin = "C:\Program Files\LLVM\bin"
+          $version = & "$llvmBin\clang-cl.exe" --version
+          if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch 'clang version 22\.1\.0\b') {
+            throw "Expected installed Clang 22.1.0, got: $version"
+          }
+          Write-Host ($version -join "`n")
+          $llvmBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Set cache key arch
         if: steps.check.outputs.should_build == 'true'
