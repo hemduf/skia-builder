@@ -24,16 +24,27 @@ on:
         required: false
         type: boolean
         default: false
+      publish_arm64_run_id:
+        description: 'Verify/publish the reviewed ARM64 artifact run (empty builds normally)'
+        required: false
+        type: string
+        default: ''
+      publish_arm64_dry_run:
+        description: 'Verify publication manifest without uploading release assets'
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.skia_branch || 'chrome/m153' }}-${{ inputs.platforms || 'all' }}-${{ inputs.skip_release && 'skip-release' || 'release' }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.skia_branch || 'chrome/m153' }}-${{ inputs.platforms || 'all' }}-${{ inputs.skip_release && 'skip-release' || 'release' }}-${{ inputs.publish_arm64_run_id || 'build' }}
+  cancel-in-progress: ${{ inputs.publish_arm64_run_id == '' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-skia:
+    if: ${{ inputs.publish_arm64_run_id == '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -392,7 +403,7 @@ jobs:
 
   create-xcframework:
     needs: build-skia
-    if: ${{ !inputs.skip_release && (inputs.platforms == 'all') }}
+    if: ${{ inputs.publish_arm64_run_id == '' && !inputs.skip_release && (inputs.platforms == 'all') }}
     runs-on: macos-15
     steps:
       - name: Download macOS artifact
@@ -498,7 +509,7 @@ jobs:
           path: Skia.xcframework.zip
 
   create-release:
-    if: ${{ !inputs.skip_release && inputs.platforms == 'all' }}
+    if: ${{ inputs.publish_arm64_run_id == '' && !inputs.skip_release && inputs.platforms == 'all' }}
     needs: [build-skia, create-xcframework]
     runs-on: ubuntu-latest
     permissions:
@@ -538,3 +549,38 @@ jobs:
             ./Skia.xcframework/Skia.xcframework.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-reviewed-arm64:
+    if: ${{ inputs.publish_arm64_run_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Verify reviewed packages and publish only missing ARM64 assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.publish_arm64_run_id }}
+          DRY_RUN: ${{ inputs.publish_arm64_dry_run }}
+        shell: bash
+        run: |
+          args=()
+          if [[ "$DRY_RUN" == 'false' ]]; then
+            args+=(--publish)
+          fi
+          python3 tools/publish_windows_arm64.py --run-id "$SOURCE_RUN" \
+            --directory "$RUNNER_TEMP/arm64-publication" "${args[@]}"
+      - name: Save verified publication manifest
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64-publication-manifest
+          path: ${{ runner.temp }}/arm64-publication/publication-manifest.json
+          if-no-files-found: ignore
