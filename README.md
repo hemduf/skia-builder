@@ -146,6 +146,26 @@ check locally with LLVM tools on PATH:
 py -3 tools/validate_windows_arm64.py build/win-gpu-md/lib/Release/arm64
 ```
 
+### Publish the reviewed ARM64 packages without rebuilding
+
+The existing **Build Skia** manual workflow accepts `publish_arm64_run_id`.
+Leave it empty for the ordinary build flow. Set it to `44118742917` for the
+reviewed M153 ARM64 artifacts; `publish_arm64_dry_run` defaults to `true` and
+verifies the packages and produces a publication manifest without uploading.
+After reviewing that result, dispatch from `main` with the same run ID and
+`publish_arm64_dry_run=false` to add only missing ARM64 assets to the existing
+`chrome/m153` release. Matching existing assets are skipped; conflicts fail.
+No tags, releases, x64 assets or existing binaries are replaced.
+
+Publication is restricted to the reviewed source SHA and four measured ZIP
+hashes in `tools/publish_windows_arm64.py`; another source run needs an explicit
+manifest update. The workflow verifies source ancestry in `main`, every Windows
+job and the four ARM64 validation steps, artifact provenance and wrapper digests,
+safe inner paths, COFF ARM64 library members and build metadata. The source run
+has unrelated cancelled macOS jobs, so its overall conclusion is not described
+as green: the gate qualifies the successful Windows jobs only. Runtime graphics
+and NativeUI/Oreto integration remain separate qualification.
+
 ### CRT linkage (/MT vs /MD)
 
 By default Windows libraries are built with the static CRT (`/MT`, `/MTd` for Debug). Pass `-crt MD` to build against the dynamic CRT (`/MD`, `/MDd` for Debug) instead — this also switches Dawn's CMake build to `MultiThreadedDLL`. MD builds are output to `build/win-gpu-md/lib/` so they don't collide with the default MT output in `build/win-gpu/lib/`.
