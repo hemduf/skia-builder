@@ -116,8 +116,9 @@ py -3 build-skia.py -config Release -branch chrome/m153 win
 
 ### Windows ARM64
 
-Build on a Windows ARM64 machine with Visual Studio 2022 C++ ARM64 tools,
-a Windows SDK, LLVM 20.1.0 and CMake 4.4.3 installed:
+Build on a Windows ARM64 machine with Visual Studio C++ ARM64 tools,
+a Windows SDK, LLVM 22.1.0 and CMake 4.4.3 installed. The current GitHub ARM64
+runner MSVC STL requires Clang 22 or newer; x64 CI keeps LLVM 20.1.0:
 
 ```bash
 py -3 build-skia.py win -archs arm64 -variant gpu -config Release -crt MD -branch chrome/m153
