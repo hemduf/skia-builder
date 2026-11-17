@@ -114,6 +114,37 @@ LLVM should be installed in `C:\Program Files\LLVM\`
 py -3 build-skia.py -config Release -branch chrome/m153 win
 ```
 
+### Windows ARM64
+
+Build on a Windows ARM64 machine with Visual Studio 2022 C++ ARM64 tools,
+a Windows SDK, LLVM 20.1.0 and CMake 4.4.3 installed:
+
+```bash
+py -3 build-skia.py win -archs arm64 -variant gpu -config Release -crt MD -branch chrome/m153
+```
+
+The workflow builds ARM64 natively on `windows-11-arm` for both Debug/Release
+and MT/MD. It publishes `skia-build-win-arm64-gpu[-md]-{release,debug}.zip`;
+MD libraries live in `build/win-gpu-md/lib/Release/arm64/` (or `Debug`), and
+MT libraries in `build/win-gpu/lib/<config>/arm64/`. Existing x64 paths and
+archive names remain unchanged. Use the same CRT and configuration in consumers.
+
+ARM64 preserves Ganesh/OpenGL assembled-interface support, as well as Dawn/Graphite.
+Skia M153's `GrGLMakeNativeInterface()` returns `nullptr` on Windows ARM64:
+consumers must supply a current GL context and a procedure resolver to
+`GrGLMakeAssembledInterface()` (as NativeUI's Pugl renderer does). ANGLE DLLs
+remain limited to x64/Win32 in this patch. Rendering therefore requires a
+compatible WGL/OpenGL driver or compatibility layer; this patch does not certify
+real GPU rendering or NativeUI/Oreto host integration. Those consumers also need
+their own ARM64 package selection and Win32 embedding support.
+Before packaging, CI checks every COFF archive member is ARM64, requires the
+Skia/Dawn libraries, and checks defined Ganesh/OpenGL entry points. To run that
+check locally with LLVM tools on PATH:
+
+```bash
+py -3 tools/validate_windows_arm64.py build/win-gpu-md/lib/Release/arm64
+```
+
 ### CRT linkage (/MT vs /MD)
 
 By default Windows libraries are built with the static CRT (`/MT`, `/MTd` for Debug). Pass `-crt MD` to build against the dynamic CRT (`/MD`, `/MDd` for Debug) instead — this also switches Dawn's CMake build to `MultiThreadedDLL`. MD builds are output to `build/win-gpu-md/lib/` so they don't collide with the default MT output in `build/win-gpu/lib/`.
@@ -126,7 +157,7 @@ In CI, MD builds are published as separate zips: `skia-build-win-x64-gpu-md-rele
 
 ### ANGLE
 
-Windows GPU builds enable ANGLE (`skia_use_angle=true`). The Windows packages include `libEGL.dll`/`libGLESv2.dll` and their import libs (`libEGL.dll.lib`/`libGLESv2.dll.lib`) alongside the Skia libraries, plus the ANGLE headers (EGL, GLES2/3, KHR) under `include/angle/` — add that directory to your include paths to use `<EGL/egl.h>` etc. The ANGLE DLLs are self-contained, so the same DLLs work with both MT and MD packages.
+Windows x64/Win32 GPU builds enable ANGLE (`skia_use_angle=true`). The Windows packages include `libEGL.dll`/`libGLESv2.dll` and their import libs (`libEGL.dll.lib`/`libGLESv2.dll.lib`) alongside the Skia libraries, plus the ANGLE headers (EGL, GLES2/3, KHR) under `include/angle/` — add that directory to your include paths to use `<EGL/egl.h>` etc. The ANGLE DLLs are self-contained, so the same DLLs work with both MT and MD packages.
 
 ## CI / GitHub Actions
 

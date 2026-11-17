@@ -107,11 +107,30 @@ jobs:
             arch: "wasm32"
             config: Release
 
-          # Windows ARM64 (later)
-          # - os: windows-11-arm
-          #   platform: win
-          #   variant: gpu
-          #   arch: arm64
+          - os: windows-11-arm
+            platform: win
+            variant: gpu
+            arch: arm64
+            config: Release
+            crt: MT
+          - os: windows-11-arm
+            platform: win
+            variant: gpu
+            arch: arm64
+            config: Release
+            crt: MD
+          - os: windows-11-arm
+            platform: win
+            variant: gpu
+            arch: arm64
+            config: Debug
+            crt: MT
+          - os: windows-11-arm
+            platform: win
+            variant: gpu
+            arch: arm64
+            config: Debug
+            crt: MD
           # CPU variants
           # - os: macos-15
           #   platform: mac
@@ -284,6 +303,16 @@ jobs:
           llvm-ar p "$LIB" "$MEMBER" > /tmp/skia-arm64-smoke.o
           llvm-readelf -h /tmp/skia-arm64-smoke.o | tee /tmp/skia-arm64-readelf.txt
           grep -q 'Machine:.*AArch64' /tmp/skia-arm64-readelf.txt
+
+      - name: Validate Windows ARM64 package
+        if: steps.check.outputs.should_build == 'true' && !inputs.test_mode && matrix.platform == 'win' && matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          SUFFIX="${{ matrix.variant }}"
+          if [ "${{ matrix.crt }}" = "MD" ]; then
+            SUFFIX="${SUFFIX}-md"
+          fi
+          python3 tools/validate_windows_arm64.py "build/win-${SUFFIX}/lib/${{ matrix.config }}/arm64"
 
       - name: Set archive name
         if: steps.check.outputs.should_build == 'true'
@@ -489,6 +518,10 @@ jobs:
             ./skia-build-win-x64-gpu-debug/skia-build-win-x64-gpu-debug.zip
             ./skia-build-win-x64-gpu-md-release/skia-build-win-x64-gpu-md-release.zip
             ./skia-build-win-x64-gpu-md-debug/skia-build-win-x64-gpu-md-debug.zip
+            ./skia-build-win-arm64-gpu-release/skia-build-win-arm64-gpu-release.zip
+            ./skia-build-win-arm64-gpu-debug/skia-build-win-arm64-gpu-debug.zip
+            ./skia-build-win-arm64-gpu-md-release/skia-build-win-arm64-gpu-md-release.zip
+            ./skia-build-win-arm64-gpu-md-debug/skia-build-win-arm64-gpu-md-debug.zip
             ./skia-build-linux-x64-gpu-release/skia-build-linux-x64-gpu-release.zip
             ./skia-build-linux-arm64-gpu-release/skia-build-linux-arm64-gpu-release.zip
             ./skia-build-wasm-wasm32-gpu-release/skia-build-wasm-wasm32-gpu-release.zip
