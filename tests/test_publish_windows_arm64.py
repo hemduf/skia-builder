@@ -107,7 +107,13 @@ class ZipTests(unittest.TestCase):
     def test_unsafe_duplicate_or_symlink_members_are_rejected(self):
         for name in ('../escape', '/absolute', 'a/../escape', 'a\\escape', 'C:/escape',
                      'a//escape', './escape', 'a/./escape'):
-            with self.subTest(name=name), zipfile.ZipFile(io.BytesIO(zip_bytes([(name, b'x')]))) as z:
+            data = zip_bytes([(name, b'x')])
+            if '\\' in name:
+                # Windows zipfile writers normalize separators; put the actual
+                # hostile spelling in both local and central ZIP headers.
+                data = data.replace(name.replace('\\', '/').encode(), name.encode())
+            with self.subTest(name=name), zipfile.ZipFile(io.BytesIO(data)) as z:
+                self.assertEqual(name, z.infolist()[0].orig_filename)
                 with self.assertRaises(ValueError):
                     publisher.safe_members(z)
         with warnings.catch_warnings():

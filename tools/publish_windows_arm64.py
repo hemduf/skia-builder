@@ -116,7 +116,10 @@ def safe_members(archive):
     names = set()
     total = 0
     for info in infos:
-        name = info.filename
+        # zipfile may normalize native separators on Windows. Inspect the raw
+        # archive spelling too, so host normalization cannot hide an unsafe name.
+        name = info.orig_filename
+        require(name == info.filename, 'ZIP filename was normalized by the host')
         parts = PurePosixPath(name).parts
         require(name and '\\' not in name and ':' not in name and
                 not name.startswith('/') and
@@ -261,7 +264,6 @@ class GitHub:
     def download(self, endpoint, output):
         with output.open('xb') as stream:
             subprocess.run(['gh', 'api', '--hostname', 'github.com',
-                            '-H', 'Accept: application/octet-stream',
                             f'repos/{REPOSITORY}/{endpoint}'], stdout=stream, check=True)
 
     def upload(self, package):
