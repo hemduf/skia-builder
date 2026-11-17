@@ -482,7 +482,7 @@ class SkiaBuildScript:
         return TMP_DIR / name
 
     def win_angle_enabled(self, arch):
-        """ANGLE is built on Windows GPU builds, except arm64 (no GL there)."""
+        """ANGLE packaging is qualified for x64/Win32; ARM64 uses native GL."""
         return self.platform == "win" and self.variant == "gpu" and arch != "arm64"
 
     def get_lib_dir(self, platform):
@@ -635,11 +635,11 @@ class SkiaBuildScript:
                 gn_args += "target_cpu = \"x86\"\n"
             elif arch == "arm64":
                 gn_args += "target_cpu = \"arm64\"\n"
-                # OpenGL is not supported on Windows ARM64, Dawn/Graphite will be used
-                gn_args += "skia_use_gl = false\n"
+                # Preserve Ganesh/OpenGL for native WGL consumers such as NativeUI.
+                # Driver availability is a runtime concern, not an architecture ban.
             else:  # x64
                 gn_args += "target_cpu = \"x64\"\n"
-            # ANGLE requires GL, so it's excluded on arm64 (skia_use_gl = false above)
+            # Keep the existing ANGLE package policy; ARM64 uses native GL only.
             if self.win_angle_enabled(arch):
                 gn_args += "skia_use_angle = true\n"
             # Find Clang installation - prefer standalone LLVM, fallback to VS bundled
